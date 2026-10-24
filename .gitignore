@@ -1,0 +1,9 @@
+# 本地演示打包产物与截图（无需上传）
+.trae-html-share-packages/
+.screenshots/
+
+# 依赖与系统文件
+node_modules/
+*.log
+.DS_Store
+Thumbs.db

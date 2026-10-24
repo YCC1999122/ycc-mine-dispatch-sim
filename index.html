@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YCC 矿山调度模拟 · 虚拟仿真控制台</title>
+<link rel="stylesheet" href="./css/app.css?v=boot1">
+</head>
+<body>
+<div id="app">
+  <!-- 启动初始化界面：标注 YCC 模拟平台与当次仿真的设施清单 -->
+  <div id="boot" class="boot">
+    <div class="boot-scan"></div>
+    <div class="boot-core">
+      <div class="boot-logo">
+        <div class="boot-mark"><span>YCC</span></div>
+        <div class="boot-brand">
+          <b>YCC 矿山调度模拟</b>
+          <small>YCC MINE DISPATCH SIMULATION</small>
+        </div>
+      </div>
+
+      <div class="boot-tagline">
+        <span class="boot-badge">虚拟仿真</span>
+        <span>非真实矿山　·　画面与数据全部由仿真引擎生成</span>
+      </div>
+
+      <ul class="boot-list" id="bootList">
+        <li class="boot-item"><i class="bi"></i><span>采坑地形 · 5 级台段 L0–L5</span><em>待初始化</em></li>
+        <li class="boot-item"><i class="bi"></i><span>东西折返坡道 · 单向通行</span><em>待初始化</em></li>
+        <li class="boot-item"><i class="bi"></i><span>采装工作面 · EX-01 ～ EX-06</span><em>待初始化</em></li>
+        <li class="boot-item"><i class="bi"></i><span>卸载点 · 北破碎站 / 东破碎站 / 西排土场</span><em>待初始化</em></li>
+        <li class="boot-item"><i class="bi"></i><span>能源站 · ES-N / ES-E / ES-S / ES-W</span><em>待初始化</em></li>
+        <li class="boot-item"><i class="bi"></i><span>运输车队 · 40 × 100t 电动矿卡</span><em>待初始化</em></li>
+        <li class="boot-item"><i class="bi"></i><span>远景设施 · 南火电厂 / 东北光伏 / 西风场</span><em>待初始化</em></li>
+      </ul>
+
+      <div class="boot-bar"><i id="bootBar"></i></div>
+      <div class="boot-meta">
+        <span id="bootText">正在构建采坑地形与运输路网…</span>
+        <b id="bootPct">0%</b>
+      </div>
+    </div>
+    <div class="boot-foot">YCC SIMULATION PLATFORM　·　初始化自检画面不代表真实生产状态</div>
+  </div>
+
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-mark"><span></span></div>
+      <div class="brand-text">
+        <b>YCC 矿山调度模拟 <span class="sim-tag">模拟</span></b>
+        <small>虚拟仿真 · 非真实矿山　40 × 100t 电动矿卡　采装—运输—换电一体化调度域</small>
+      </div>
+    </div>
+
+    <div class="shift">
+      <div class="shift-clock">
+        <b id="clock">06:00:00</b>
+        <span>班次时钟</span>
+      </div>
+      <div class="shift-body">
+        <div class="shift-bar"><i id="shiftBar"></i></div>
+        <div class="shift-meta">
+          <span id="shiftLabel">班次进度 0%</span>
+          <span id="weatherLabel">晴 · 路面干燥 · 限速正常</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="top-controls">
+      <div class="seg" id="speedGroup">
+        <button data-speed="1">1×</button>
+        <button data-speed="2" class="on">2×</button>
+        <button data-speed="5">5×</button>
+        <button data-speed="10">10×</button>
+        <button data-speed="20">20×</button>
+      </div>
+      <button id="btnPause" class="btn ghost">暂停</button>
+      <button id="btnReset" class="btn ghost">重置</button>
+      <button id="btnHelp" class="btn ghost">模型说明</button>
+      <div class="link-status">
+        <i id="statusDot"></i>
+        <span id="statusText">调度链路在线</span>
+        <span class="fps" id="fps">-- FPS</span>
+      </div>
+    </div>
+  </header>
+
+  <main id="layout">
+    <aside id="left">
+      <section class="panel">
+        <div class="p-head">
+          <h3>班次产能</h3>
+          <span class="pill live">实时</span>
+        </div>
+        <div class="rate"><b id="kpiRate">0</b><small>t/h</small></div>
+        <div class="prod-split">
+          <div><span>累计产量</span><b id="kpiTotal">0 t</b></div>
+          <div><span>矿石</span><b id="kpiOre">0 t</b></div>
+          <div><span>废岩</span><b id="kpiWaste">0 t</b></div>
+        </div>
+        <div class="target">
+          <div class="target-top"><span>班次目标 68,000 t</span><b id="targetPct">0%</b></div>
+          <div class="bar"><i id="targetBar"></i></div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="prodChart"></canvas>
+          <span class="chart-cap">小时产能趋势</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="p-head"><h3>采装与卸载</h3><span class="hint">FCFS 排队</span></div>
+        <div id="shovelList" class="list"></div>
+        <div id="dumpList" class="list dump"></div>
+      </section>
+
+      <section class="panel">
+        <div class="p-head"><h3>能源站</h3><span class="hint">单换电工位</span></div>
+        <div id="stationList"></div>
+      </section>
+
+      <section class="panel">
+        <div class="p-head"><h3>调度参数</h3><span class="hint">在线调整</span></div>
+        <div class="field">
+          <label>调度策略</label>
+          <div class="seg small" id="modeGroup">
+            <button data-mode="balanced" class="on">均衡</button>
+            <button data-mode="production">产量优先</button>
+            <button data-mode="energy">能耗优先</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>气象工况</label>
+          <div class="seg small" id="weatherGroup">
+            <button data-weather="clear" class="on">晴</button>
+            <button data-weather="dust">扬尘</button>
+            <button data-weather="rain">降雨</button>
+            <button data-weather="snow">降雪</button>
+            <button data-weather="wind">大风</button>
+            <button data-weather="sandstorm">风沙</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>换电触发阈值 <b id="socValue">32%</b></label>
+          <input id="socRange" type="range" min="18" max="50" step="1" value="32">
+        </div>
+        <div class="param-note">
+          目标函数：时间成本 = 运距 + 预计排队 + 匹配惩罚 + 矿种优先级；滚动重调度周期 2s；装/卸/换电均按先到先服务。
+        </div>
+      </section>
+    </aside>
+
+    <section id="stage">
+      <canvas id="gl"></canvas>
+      <canvas id="overview2d"></canvas>
+
+      <button id="view2dBtn" class="btn ghost mini hud hud-map2d">2D 总览</button>
+
+      <div class="hud hud-kpi">
+        <div class="chip"><span>在运矿卡</span><b id="kpiActive">0/40</b></div>
+        <div class="chip"><span>平均循环</span><b id="kpiCycle">0.0<small>min</small></b></div>
+        <div class="chip"><span>匹配系数</span><b id="kpiMatch">0.00</b></div>
+        <div class="chip"><span>设备利用率</span><b id="kpiUtil">0%</b></div>
+        <div class="chip"><span>吨矿电耗</span><b id="kpiEnergy">0.00<small>kWh/t</small></b></div>
+        <div class="chip"><span>换电次数</span><b id="kpiSwaps">0</b></div>
+      </div>
+
+      <div class="hud hud-view">
+        <div class="seg small" id="viewGroup">
+          <button data-view="overview" class="on">全景</button>
+          <button data-view="pit">坑内</button>
+          <button data-view="top">俯视</button>
+          <button data-view="free">自由</button>
+        </div>
+        <button id="followBtn" class="btn ghost mini">跟随选中</button>
+      </div>
+
+      <div class="hud hud-legend">
+        <span><i class="dot s-move"></i>行驶</span>
+        <span><i class="dot s-work"></i>装卸</span>
+        <span><i class="dot s-queue"></i>排队</span>
+        <span><i class="dot s-energy"></i>换电/充电</span>
+        <span><i class="dot s-idle"></i>待命</span>
+      </div>
+
+      <div class="hud hud-minimap" id="miniWrap">
+        <div class="mm-head"><span>矿场态势</span><b id="mmCoord">E 0 · N 0</b></div>
+        <canvas id="miniMap"></canvas>
+        <div class="mm-foot"><span id="mmHeading">航向 0°</span><span id="mmSpeed">0.0 km/h</span></div>
+      </div>
+
+      <div class="hud drive-panel" id="drivePanel">
+        <div class="dp-head">
+          <div class="dp-title"><b>驾驶模式</b><span id="dpTruck">未选择车辆</span></div>
+          <button id="driveToggle" class="btn primary mini">进入驾驶</button>
+        </div>
+        <div class="dp-body">
+          <div class="dp-views" id="driveViews">
+            <button data-cam="front" class="on">前视</button>
+            <button data-cam="rear">后视</button>
+            <button data-cam="left">左视</button>
+            <button data-cam="right">右视</button>
+            <button data-cam="third">第三人称</button>
+          </div>
+          <div class="dp-tip">W/S 前进后退 · A/D 转向 · Shift 加速 · Space 制动 · Esc 退出</div>
+        </div>
+      </div>
+
+      <div id="hoverTip"></div>
+
+      <div id="truckstrip">
+        <div class="strip-head">
+          <span>车队实时状态</span>
+          <span class="hint">点击车辆：主视角锁定三维跟拍 + 车载前视画面</span>
+        </div>
+        <div class="strip" id="truckStrip"></div>
+      </div>
+    </section>
+
+    <aside id="right">
+      <section class="panel stats">
+        <div class="p-head"><h3>运行总览</h3><span class="hint" id="statsMeta">实时刷新</span></div>
+        <div class="stat-grid">
+          <div><span>在运矿卡</span><b id="stActive">0/40</b></div>
+          <div><span>平均循环</span><b id="stCycle">—</b></div>
+          <div><span>匹配系数</span><b id="stMatch">—</b></div>
+          <div><span>设备利用率</span><b id="stUtil">0%</b></div>
+          <div><span>吨矿电耗</span><b id="stEnergy">0.00</b></div>
+          <div><span>平均排队</span><b id="stQueue">—</b></div>
+          <div><span>累计趟次</span><b id="stTrips">0</b></div>
+          <div><span>换电次数</span><b id="stSwaps">0</b></div>
+        </div>
+        <div class="stat-mix">
+          <div class="mix-row"><span>矿石</span><b id="stOre">0 t</b></div>
+          <div class="mix-bar"><i id="stMixBar"></i></div>
+          <div class="mix-row"><span>废岩</span><b id="stWaste">0 t</b></div>
+        </div>
+        <div class="stat-state" id="statState"></div>
+      </section>
+
+      <section class="panel alerts">
+        <div class="p-head"><h3>告警与干预</h3><span class="count" id="alertCount">0</span></div>
+        <div class="health-box" id="healthBox"></div>
+        <div id="alertsList" class="alert-list"></div>
+      </section>
+
+      <section class="panel logs">
+        <div class="p-head"><h3>调度事件</h3><span class="hint" id="logMeta">实时推送</span></div>
+        <div class="log-summary" id="logSummary"></div>
+        <div class="log-filter" id="logFilter">
+          <button data-f="key" class="on">关键</button>
+          <button data-f="all">全部</button>
+          <button data-f="dispatch">调度</button>
+          <button data-f="haul">装卸</button>
+          <button data-f="energy">补能</button>
+          <button data-f="alert">告警</button>
+        </div>
+        <div id="logList" class="log-list"></div>
+      </section>
+
+      <section class="panel cab-panel-section">
+        <div id="cabPanel">
+          <div class="cab-head">
+            <div class="cab-title">
+              <i id="cabDot"></i>
+              <b id="cabTitle">T-101</b>
+              <span id="cabState">待命</span>
+            </div>
+            <div class="cab-head-right">
+              <span class="cab-tag" id="cabTag">前视摄像头 · 模拟视频流</span>
+              <button id="cabClose" class="icon-btn" title="关闭">×</button>
+            </div>
+          </div>
+          <div class="cab-frame">
+            <canvas id="cabCanvas"></canvas>
+            <div class="cab-osd"><span>FRONT CAM 01</span><span id="cabTime">06:00:00</span></div>
+            <div class="cab-cross"></div>
+            <div class="cab-speed"><b id="cabSpeed">0.0</b><small>km/h</small></div>
+            <div class="cab-signal"><i></i><span>LINK 32ms</span></div>
+          </div>
+          <div class="cab-metrics">
+            <div><span>电量</span><b id="cabSoc">--</b><div class="meter"><i id="cabSocBar"></i></div></div>
+            <div><span>载重</span><b id="cabPayload">--</b><div class="meter load"><i id="cabPayloadBar"></i></div></div>
+            <div><span>目标</span><b id="cabTarget">--</b></div>
+            <div><span>本趟排队</span><b id="cabQueue">--</b></div>
+          </div>
+          <div class="cab-controls">
+            <select id="cabAssign" class="select" title="人工指派目标"></select>
+            <button id="cabAssignBtn" class="btn primary">下发指派</button>
+            <label class="check"><input type="checkbox" id="cabFollow"><span>主视角跟随</span></label>
+          </div>
+        </div>
+      </section>
+    </aside>
+  </main>
+</div>
+
+<div id="helpModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>模型与调度说明</h2>
+      <button id="helpClose" class="icon-btn">×</button>
+    </div>
+    <div class="modal-body">
+      <h3>设施类型</h3>
+      <div class="facility-grid">
+        <div class="fac-card">
+          <div class="fac-icon" style="background:linear-gradient(135deg,#d97706,#b45309)">⛏️</div>
+          <div class="fac-name">电铲 (Shovel)</div>
+          <div class="fac-desc">矿石/废岩装载，额定 100 t，装车约 60 s/车</div>
+        </div>
+        <div class="fac-card">
+          <div class="fac-icon" style="background:linear-gradient(135deg,#64748b,#334155)">🏭</div>
+          <div class="fac-name">破碎站 (Crusher)</div>
+          <div class="fac-desc">矿石卸载点，受料斗受料，卸车约 55 s/车</div>
+        </div>
+        <div class="fac-card">
+          <div class="fac-icon" style="background:linear-gradient(135deg,#a16207,#78350f)">🏔️</div>
+          <div class="fac-name">排土场 (Waste Dump)</div>
+          <div class="fac-desc">废岩卸载区，分层排卸，卸车约 50 s/车</div>
+        </div>
+        <div class="fac-card">
+          <div class="fac-icon" style="background:linear-gradient(135deg,#16a34a,#14532d)">🔋</div>
+          <div class="fac-name">能源站 (Energy)</div>
+          <div class="fac-desc">换电约 9 min，4 块 240 kWh 电池包轮换</div>
+        </div>
+        <div class="fac-card">
+          <div class="fac-icon" style="background:linear-gradient(135deg,#2563eb,#1e3a8a)">🚚</div>
+          <div class="fac-name">矿卡 (Truck)</div>
+          <div class="fac-desc">纯电动无人矿卡，重载 4.4 / 空载 1.6 kWh/km</div>
+        </div>
+      </div>
+      <h3>场景与作业逻辑</h3>
+      <p>固定地形为超椭圆不规则采坑，5 个 15m 台段呈阶梯状下降，坑口外设环形地表运输道。每个台段（含坑底）都有沿台面中线绕坑一圈的环形运输道，仅在东侧折返坡道切穿台面处断开并接入本层坡道落点，车辆可从落点沿任一方向绕行到各工作面。全矿布置 6 个采掘工作面（4 矿石 / 2 废岩），每个工作面配置独立装车泊位与沿台段轮廓展开的排队车位，矿卡驶入车位对位后由电铲装载，额定 100 t；满载后经道路网驶向 3 个卸载点（北破碎站 / 东破碎站 / 西排土场）卸车，再空载返回，形成闭环。</p>
+      <h3>调度目标</h3>
+      <p>以时间成本最小化为核心：<code>cost = 运距时间 + 预计排队时间 + 铲车匹配惩罚 + 矿种优先级</code>。调度器每 2 秒滚动重算，限制单铲排队长度，避免多车同时压向同一工作面。电量低于换电阈值时优先插入能源站任务。</p>
+      <h3>能耗与补能</h3>
+      <p>能耗按重载 4.4 kWh/km、空载 1.6 kWh/km 计算，叠加坡度、附件功耗 6 kW 及天气系数。天气变化会同步影响道路限速与能耗。换电站配置 1 个换电工位、1 个直流补电工位、4 个 240 kWh 电池包与 2 个充电位；换电单次约 9 分钟，旧电池包进入充电位补能，队列按先到先服务。</p>
+      <h3>指标口径</h3>
+      <p>产能为近 10 分钟滚动折算的小时产量；匹配系数为各铲分配车辆数与理论需求车辆数之比；设备利用率为矿卡行驶时间占在册时间的比例；吨矿电耗为全部矿卡牵引与附件能耗除以累计产量。</p>
+      <h3>说明</h3>
+      <p>本系统为课题研究用离线仿真：车辆位置、装载、电量与视频画面均由后台引擎实时生成，不接入真实车载终端与网络通信。</p>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module" src="./js/main.js?v=boot1"></script>
+</body>
+</html>

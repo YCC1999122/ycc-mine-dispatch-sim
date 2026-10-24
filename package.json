@@ -1,0 +1,7 @@
+{
+  "name": "northpit-dispatch-sim",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Open-pit mine intelligent haulage dispatch simulation"
+}
